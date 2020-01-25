@@ -1,11 +1,13 @@
 package com.wohlmuth.securityexample
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.google.crypto.tink.subtle.Hex
 import kotlinx.android.synthetic.main.activity_main.*
 import java.security.MessageDigest
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -15,7 +17,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var sharedPreferences: EncryptedSharedPreferences
-    private val digest = MessageDigest.getInstance("MD5")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,13 +38,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun savePassword() {
-        // Generate MD5 Hash
-        val md5TypedArray = digest.digest(etPassword.text.toString().toByteArray()).toTypedArray()
-        val hashString = byteArrayToHexString(md5TypedArray)
-
         // Save data to the EncryptedSharedPreferences
         sharedPreferences.edit()
-                .putString(PREFERENCE_PASSWORD_KEY, hashString)
+                .putString(PREFERENCE_PASSWORD_KEY, sha256AsHexString(etPassword.text.toString()))
                 .apply()
     }
 
@@ -53,14 +50,20 @@ class MainActivity : AppCompatActivity() {
         tvHash.text = value
     }
 
-    private fun byteArrayToHexString( array: Array<Byte> ): String {
-        val result = StringBuilder(array.size * 2)
-        for ( byte in array ) {
-            val toAppend = String.format("%2X", byte).replace(" ", "0") // hexadecimal
-            result.append(toAppend).append("-")
-        }
-        result.setLength(result.length - 1) // remove last '-'
+    private fun sha256AsHexString(message: String?): String? {
+        require(!(message == null || message.isEmpty())) { "Invalid message string!" }
+        val bytes = sha256(message)
+        return Hex.encode(bytes)
+    }
 
-        return result.toString()
+
+    private fun sha256(message: String): ByteArray {
+        return try {
+            val algorithm = MessageDigest.getInstance("SHA-256")
+            algorithm.update(message.toByteArray(charset("UTF-8")))
+            algorithm.digest()
+        } catch (e: Exception) {
+            throw IllegalStateException("Can't calculate SHA-256 for the given message!", e)
+        }
     }
 }
